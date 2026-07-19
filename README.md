@@ -1,3 +1,0 @@
-# Sistemas Operativos (AS)
-
-Repositorio de trabajo de la materia Sistemas Operativos (ISFT151 - 2026)
