@@ -1,0 +1,29 @@
+# Compiled binaries
+abm_c
+*.o
+*.out
+*.exe
+
+# Build artifacts
+build/
+cmake-build-*/
+*.so
+*.dylib
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
