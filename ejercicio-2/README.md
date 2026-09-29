@@ -1,10 +1,58 @@
-# Code — Lab 04 Operadores de Redirección
+# Ejercicio 2 — Lab 04 Operadores de Redirección
 
 Base: `ejercicio-1.sh` (auth `1234`, inventario en memoria, sin `Nombre`).
 
+## Consigna (resumen)
+
+1. **Reporte** `productos.html`: título + `<table>` con columnas `ID, Nombre, Precio`.
+2. **Persistencia** `db/productos.tsv` (`id<TAB>nombre<TAB>precio`): listar, alta, baja y editar. No agregar un producto ya existente.
+3. **Autenticación** `db/usuarios.tsv` (`usuario<TAB>sha256` con `sha256sum`): menú `Iniciar sesión` / `Registrar usuario`. Sin contraseñas en texto plano. No agregar un usuario ya existente.
+4. **Entrega**: `ejercicio-2.sh` en el repositorio GitHub + notificar en Classroom.
+
+## Uso
+
+```bash
+chmod +x ejercicio-2.sh
+./ejercicio-2.sh
+```
+
+1. El programa crea `db/` con `productos.tsv` y `usuarios.tsv` si no existen.
+2. Menú **ACCESO**: `1` iniciar sesión, `2` registrar usuario, `3` salir.
+3. Menú **ACCIONES** (post-login): `1` alta, `2` baja, `3` mostrar, `4` editar, `5` generar reporte HTML, `6` salir.
+
+Ejemplo de sesión (alta y reporte):
+
+```
+ACCIONES:
+1. Alta producto
+...
+Opción: 1
+Ingrese ID: A1
+Ingrese Nombre: Yerba Mate
+Ingrese Precio: 120.50
+Producto A1 guardado.
+...
+Opción: 5
+Reporte generado en productos.html.
+```
+
+## Archivos
+
+- `ejercicio-2.sh`: programa (único entregable + `db/` con datos de ejemplo).
+- `db/productos.tsv`: tabla de productos (`id<TAB>nombre<TAB>precio`).
+- `db/usuarios.tsv`: tabla de usuarios (`usuario<TAB>sha256`, hash, nunca texto plano).
+- `productos.html`: reporte derivado (se regenera con la opción 5, no es fuente de verdad).
+
+## Verificación
+
+```bash
+bash -n ejercicio-2.sh
+./ejercicio-2.sh  # prueba manual punta a punta
+```
+
 ## Referencia Bash (para `ejercicio-2.sh`)
 
-### 1. Entrada (`read`) — O2/O3
+### 1. Entrada (`read`)
 
 ```bash
 read -rp "Ingrese ID: " id            # normal: ID, nombre, precio, opción, usuario
@@ -16,7 +64,7 @@ done < productos.tsv                  # leer TSV línea por línea
 
 Alt: `awk -F'\t' '{print $1}' productos.tsv` para solo una columna.
 
-### 2. Salida y redirección — O1/O2/O3
+### 2. Salida y redirección
 
 ```bash
 printf '<h1>Productos</h1>\n' > productos.html     # > crea/sobrescribe (cabecera, tmp)
@@ -28,7 +76,7 @@ cmd < archivo   # alimenta lectura (ver §1)
 Preferir `printf` sobre `echo` (portable con `\t`, formatos).
 Alt para HTML: `cat <<EOF > productos.html` en vez de serie de `>` / `>>`.
 
-### 3. Captura y pipes — O3
+### 3. Captura y pipes
 
 ```bash
 valor=$(echo "1234")                  # $(...) captura stdout en variable
@@ -38,7 +86,7 @@ hash=${hash%% *}                      # alt sin subproceso: quita desde el prime
 sub=${cadena:3:8}                     # subcadena (hint de cátedra)
 ```
 
-### 4. Validación / duplicados — O2/O3
+### 4. Validación / duplicados
 
 ```bash
 [[ -f productos.tsv ]] || touch productos.tsv
