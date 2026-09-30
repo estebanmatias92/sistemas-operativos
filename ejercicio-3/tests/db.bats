@@ -40,25 +40,25 @@ teardown() {
 }
 
 @test "add_product guarda y rechaza duplicado sin escribir" {
-  run add_product "A1" "Yerba Mate" "120.50"
+  run add_product "A1" "Yerba Mate" "120.50" "1" "u1"
   [ "$status" -eq 0 ]
   run record_exists productos "A1"
   [ "$status" -eq 0 ]
-  run add_product "A1" "Otro" "10"
+  run add_product "A1" "Otro" "10" "1" "u1"
   [ "$status" -ne 0 ]
   count="$(sqlite3 "$DB" "SELECT COUNT(*) FROM productos;")"
   [ "$count" -eq 1 ]
 }
 
 @test "add_product inválido no escribe" {
-  run add_product "A1" "Yerba" "mal-precio"
+  run add_product "A1" "Yerba" "mal-precio" "1" "u1"
   [ "$status" -ne 0 ]
   count="$(sqlite3 "$DB" "SELECT COUNT(*) FROM productos;")"
   [ "$count" -eq 0 ]
 }
 
 @test "sql_escape: nombre con comilla simple no rompe ni inyecta" {
-  run add_product "B1" "O'Brien" "5"
+  run add_product "B1" "O'Brien" "5" "1" "u1"
   [ "$status" -eq 0 ]
   run record_exists productos "B1"
   [ "$status" -eq 0 ]
@@ -67,12 +67,12 @@ teardown() {
 }
 
 @test "update/remove usan load/save y dejan mensajes" {
-  add_product "A1" "Yerba" "10" >/dev/null
-  run update_product "A1" "Yerba Mate" "20.50"
+  add_product "A1" "Yerba" "10" "1" "u1" >/dev/null
+  run update_product "A1" "Yerba Mate" "20.50" "1" "u1"
   [ "$status" -eq 0 ]
   price="$(sqlite3 "$DB" "SELECT precio FROM productos WHERE id='A1';")"
   [ "$price" = "20.50" ]
-  run remove_product "A1"
+  run remove_product "A1" "1" "u1"
   [ "$status" -eq 0 ]
   run record_exists productos "A1"
   [ "$status" -ne 0 ]

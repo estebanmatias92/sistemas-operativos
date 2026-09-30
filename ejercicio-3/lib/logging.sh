@@ -12,8 +12,10 @@ log_action() {
 }
 
 # @brief Adjunta un error a error.log + stderr (no sale del programa).
+# Formato: fecha/hora + mensaje (igual date que system.log; el stderr de
+# sqlite3 queda crudo con sus propios prefijos).
 # @param $@ mensaje.
 log_error() {
     mkdir -p "$(dirname "$ERRLOG")"
-    printf '%s\n' "$*" | tee -a "$ERRLOG" >&2
+    printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$ERRLOG" >&2
 }

@@ -1,8 +1,11 @@
 # lib/report.sh — derivado regenerable. Lee vía db.sh, escribe "$PRODUCTS_HTML".
 
 # @brief Regenera el HTML desde cero (cabecera + una fila por registro).
+# @param $1 uid del operador, $2 username del operador (auditoría punto 5).
 # @note El HTML es derivado: siempre se puede borrar y regenerar.
 generate_report() {
+    local uid="$1"
+    local user="$2"
     local -A cache
     local id resto nombre precio
     load_table productos cache
@@ -22,4 +25,5 @@ generate_report() {
     done
     printf '</table>\n</body>\n</html>\n' >> "$PRODUCTS_HTML"
     printf 'Reporte generado en %s.\n' "$PRODUCTS_HTML"
+    log_action "$uid" "$user" "reporte"
 }

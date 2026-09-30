@@ -5,7 +5,7 @@ Objetivo: `ejercicio-3.sh` + `data.sq3` + `system.log` + `error.log` + `producto
 
 ## Idea (no romper)
 
-Variabilidad = misma especificación, distinta implementación. Los casos de uso (`add_product`, `register_user`, `remove/update/list_products`, `generate_report`, `login_user`) mantienen firma y semántica; solo se redirige la capa de dependencia (`valid_table`, `sql_escape`, `record_exists`, `append_record`, `delete_record`, `load_table`, `save_table`, `init_db`) de `TSV` a `SQLite3` (`table()` del Lab 04 se eliminó: ya no hay rutas `.tsv` que resolver).
+Variabilidad = misma especificación, distinta implementación. Los casos de uso (`add_product`, `register_user`, `remove/update/list_products`, `generate_report`, `login_user`) mantienen semántica; sus firmas se extendieron con `uid`/`usuario` al final (opción B, punto 5: prepara un futuro FK `productos.owner → usuarios.id`); solo se redirige la capa de dependencia (`valid_table`, `sql_escape`, `record_exists`, `append_record`, `delete_record`, `load_table`, `save_table`, `init_db`) de `TSV` a `SQLite3` (`table()` del Lab 04 se eliminó: ya no hay rutas `.tsv` que resolver).
 
 ## Contratos (no cambiar sin avisar)
 
@@ -17,7 +17,8 @@ Variabilidad = misma especificación, distinta implementación. Los casos de uso
   `id`/`username` únicos (no duplicados en altas); `nombre` con espacios sí, sin tab; `precio` `^[0-9]+(\.[0-9]{1,2})?$`; `username` `^[A-Za-z0-9_.-]+$`; `hash` hex 64, nunca texto plano.
 - `db/*.tsv`: legacy Lab 04, solo evidencia histórica; ningún código lo lee ni lo escribe (la semilla canónica es `sql/seed.sql`).
 - `system.log`: `fecha/hora<TAB>id<TAB>usuario<TAB>acción` por cada operación.
-- `error.log`: todo error de ejecución.
+- `error.log`: todo error de ejecución (errores amables vía `log_error()` = `fecha/hora mensaje` en stderr + archivo; `stderr` de `sqlite3` vía `2>>"$ERRLOG"` crudo).
+- Mensajes de error enriquecidos: qué pasó + dato involucrado entrecomillado (`id="A1"`, `"u1"`); nunca secretos (contraseñas/hashes jamás se loguean).
 - `productos.html` (raíz): título + `<table>` con `ID, Nombre, Precio`, idéntico al Lab 04.
 - Altas: validar formato + chequeo duplicado (`SELECT`) antes de `INSERT`; mensaje amable, sin escribir si falla.
 - Spec ejecutable en cabecera de `ejercicio-3.sh` (`RE_PRECIO`, `RE_USER`); este archivo es solo espejo.
@@ -90,7 +91,7 @@ read -sp "Contraseña: " pass; echo  # passwords ocultas; read -rp para resto
 make help          # lista targets (build/test/check/run/init/seed/clean)
 make build         # regenera ejercicio-3.sh desde lib/ (entregable)
 make check         # bash -n lib/* + bin/app + bundle (shfmt solo aviso)
-make test          # bats tests/ (13 tests: validators, db, report)
+make test          # bats tests/ (18 tests: validators, db, errors, report)
 make init          # var/db/data.sq3 desde sql/schema.sql + sql/seed.sql
 sqlite3 var/db/data.sq3 ".tables" && sqlite3 var/db/data.sq3 ".schema"
 cat var/log/system.log var/log/error.log

@@ -22,8 +22,8 @@ teardown() {
 }
 
 @test "generate_report crea HTML con cabecera y fila" {
-  add_product "1" "escoba" "3000" >/dev/null
-  run generate_report
+  add_product "1" "escoba" "3000" "1" "u1" >/dev/null
+  run generate_report "1" "u1"
   [ "$status" -eq 0 ]
   grep -q "<title>Productos</title>" "$PRODUCTS_HTML"
   grep -q "<th>ID</th><th>Nombre</th><th>Precio</th>" "$PRODUCTS_HTML"

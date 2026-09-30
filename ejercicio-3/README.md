@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS productos(
 ```bash
 make help          # lista targets
 make check         # bash -n (gate) + shfmt informativo
-make test          # bats tests/ — 13 tests (validators, db, report)
+make test          # bats tests/ — 23 tests (validators, db, errors, report, systemlog)
 make build         # regenera ejercicio-3.sh desde lib/
 make init          # var/db/data.sq3 desde schema + seed
 sqlite3 var/db/data.sq3 ".tables"      # usuarios productos
@@ -119,7 +119,9 @@ Tests con `bats` (cómo ejecutar y qué cubren):
 bats tests/                 # toda la suite
 bats tests/validators.bats  # validadores puros (precio/usuario/producto)
 bats tests/db.bats          # adapter SQLite + casos (alta/duplicado/sql_escape/update/login, seed.sql)
+bats tests/errors.bats      # punto 6: todo error (amable o SQL) deja rastro en error.log
 bats tests/report.bats      # HTML con tabla ID/Nombre/Precio
+bats tests/systemlog.bats   # punto 5: cada éxito audita en system.log (fallos no escriben)
 ```
 
 Los tests aíslan disco por env temporal (`DB`, `LOG`, `ERRLOG` apuntan a `mktemp -d`); nunca tocan `var/` real.

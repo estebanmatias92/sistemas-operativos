@@ -6,6 +6,8 @@ show_welcome() {
 }
 
 product_menu() {
+    local uid="$1"
+    local user="$2"
     local opt=""
     local id nombre precio
 
@@ -24,23 +26,23 @@ product_menu() {
                 read -rp "Ingrese ID: " id || return 0
                 read -rp "Ingrese Nombre: " nombre || return 0
                 read -rp "Ingrese Precio: " precio || return 0
-                add_product "$id" "$nombre" "$precio" || true
+                add_product "$id" "$nombre" "$precio" "$uid" "$user" || true
                 ;;
             "$OPT_REMOVE")
                 read -rp "Ingrese ID a eliminar: " id || return 0
-                remove_product "$id" || true
+                remove_product "$id" "$uid" "$user" || true
                 ;;
             "$OPT_LIST")
-                list_products
+                list_products "$uid" "$user"
                 ;;
             "$OPT_UPDATE")
                 read -rp "Ingrese ID a editar: " id || return 0
                 read -rp "Ingrese nuevo Nombre: " nombre || return 0
                 read -rp "Ingrese nuevo Precio: " precio || return 0
-                update_product "$id" "$nombre" "$precio" || true
+                update_product "$id" "$nombre" "$precio" "$uid" "$user" || true
                 ;;
             "$OPT_REPORT")
-                generate_report
+                generate_report "$uid" "$user"
                 ;;
             "$OPT_EXIT")
                 printf '\nSaliendo del programa...\n'
@@ -56,9 +58,10 @@ main() {
     init_db
     show_welcome
 
-    if ! auth_menu; then
+    local uid="" user=""
+    if ! auth_menu uid user; then
         printf '\nSaliendo del programa...\n'
         return 0
     fi
-    product_menu
+    product_menu "$uid" "$user"
 }

@@ -84,10 +84,12 @@ log_action() {
 }
 
 # @brief Adjunta un error a error.log + stderr (no sale del programa).
+# Formato: fecha/hora + mensaje (igual date que system.log; el stderr de
+# sqlite3 queda crudo con sus propios prefijos).
 # @param $@ mensaje.
 log_error() {
     mkdir -p "$(dirname "$ERRLOG")"
-    printf '%s\n' "$*" | tee -a "$ERRLOG" >&2
+    printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$ERRLOG" >&2
 }
 
 # ---- lib/db.sh ----
@@ -251,40 +253,51 @@ save_table() {
 
 # @brief Alta: valida formato, rechaza duplicado y hace append.
 # @param $1 id, $2 nombre (admite espacios), $3 precio (ver RE_PRECIO).
+# @param $4 uid del operador, $5 username del operador (auditoría punto 5).
 # @return 0 guardado / 1 inválido o duplicado (disco intacto).
 add_product() {
     local id="$1"
     local nombre="$2"
     local precio="$3"
+    local uid="$4"
+    local user="$5"
 
     if ! product_valid "$id" "$nombre" "$precio"; then
-        printf 'Error: datos de producto inválidos.\n' >&2
+        log_error "$(printf 'Error: datos de producto inválidos (id="%s", nombre="%s", precio="%s").' "$id" "$nombre" "$precio")"
         return 1
     fi
     if record_exists productos "$id"; then
-        printf 'Error: el producto "%s" ya existe.\n' "$id" >&2
+        log_error "$(printf 'Error: el producto "%s" ya existe.' "$id")"
         return 1
     fi
     append_record productos "$(printf '%s\t%s\t%s' "$id" "$nombre" "$precio")"
     printf 'Producto %s guardado.\n' "$id"
+    log_action "$uid" "$user" "$(printf 'alta id="%s"' "$id")"
 }
 
 remove_product() {
     local id="$1"
+    local uid="$2"
+    local user="$3"
     if ! record_exists productos "$id"; then
-        printf 'El producto no existe.\n'
+        log_error "$(printf 'El producto "%s" no existe.' "$id")"
         return 1
     fi
     delete_record productos "$id"
     printf 'Producto %s eliminado.\n' "$id"
+    log_action "$uid" "$user" "$(printf 'baja id="%s"' "$id")"
 }
 
 # @brief Muestra el inventario desde un cache local que se descarta al salir.
+# @param $1 uid del operador, $2 username del operador (auditoría punto 5).
 # @note Lectura sin escritura: disco queda intacto.
 list_products() {
+    local uid="$1"
+    local user="$2"
     local -A cache
     local id resto nombre precio
-    load_table productos cache
+    load_table productos cache || return 1
+    log_action "$uid" "$user" "listado"
 
     if (( ${#cache[@]} == 0 )); then
         printf '\nLISTADO: (vacío)\n'
@@ -300,25 +313,29 @@ list_products() {
 
 # @brief Modificación en memoria: load -> validar nuevo -> mutar -> save.
 # @param $1 id, $2 nombre nuevo, $3 precio nuevo.
+# @param $4 uid del operador, $5 username del operador (auditoría punto 5).
 # @return 0 actualizado / 1 id inexistente o dato inválido (disco intacto).
 update_product() {
     local id="$1"
     local nombre="$2"
     local precio="$3"
+    local uid="$4"
+    local user="$5"
     local -A cache
 
     if ! product_valid "$id" "$nombre" "$precio"; then
-        printf 'Error: datos de producto inválidos.\n' >&2
+        log_error "$(printf 'Error: datos de producto inválidos (id="%s", nombre="%s", precio="%s").' "$id" "$nombre" "$precio")"
         return 1
     fi
     load_table productos cache
     if [[ -z "${cache[$id]+x}" ]]; then
-        printf 'El producto no existe.\n'
+        log_error "$(printf 'El producto "%s" no existe.' "$id")"
         return 1
     fi
     cache["$id"]="$(printf '%s\t%s' "$nombre" "$precio")"
     save_table productos cache
     printf 'Producto %s actualizado.\n' "$id"
+    log_action "$uid" "$user" "$(printf 'edición id="%s"' "$id")"
 }
 
 # ---- lib/auth.sh ----
@@ -326,35 +343,41 @@ update_product() {
 # @brief Alta con hash: valida, chequea duplicado y persiste username+hash.
 # @param $1 username (ver RE_USER), $2 contraseña (solo vive en memoria).
 # @return 0 registrado / 1 inválido o duplicado.
+# @note En éxito audita punto 5 (el uid se resuelve post-INSERT vía SELECT).
 register_user() {
     local user="$1"
     local pass="$2"
-    local hash
+    local hash esc uid
 
     if ! is_valid_username "$user"; then
-        printf 'Error: nombre de usuario inválido.\n' >&2
+        log_error "$(printf 'Error: nombre de usuario inválido: "%s".' "$user")"
         return 1
     fi
     if [[ -z "$pass" ]]; then
-        printf 'Error: contraseña vacía.\n' >&2
+        log_error 'Error: contraseña vacía.'
         return 1
     fi
     if record_exists usuarios "$user"; then
-        printf 'Error: el usuario "%s" ya existe.\n' "$user" >&2
+        log_error "$(printf 'Error: el usuario "%s" ya existe.' "$user")"
         return 1
     fi
     hash="$(hash_password "$pass")"
     append_record usuarios "$(printf '%s\t%s' "$user" "$hash")"
     printf 'Usuario %s registrado.\n' "$user"
+    esc="$(sql_escape "$user")"
+    if uid="$(sqlite3 "$DB" "SELECT id FROM usuarios WHERE username='$esc';" 2>>"$ERRLOG")" && [[ -n "$uid" ]]; then
+        log_action "$uid" "$user" "$(printf 'registro username="%s"' "$user")"
+    fi
 }
 
 # @brief Reproduce el hash de lo tipeado y lo compara con el guardado.
 # @param $1 username, $2 contraseña tipeada.
 # @return 0 acceso / 1 denegado.
+# @note En éxito audita punto 5; en fallo no loguea (solo éxitos).
 login_user() {
     local user="$1"
     local pass="$2"
-    local want got esc
+    local want got esc uid
 
     if ! record_exists usuarios "$user"; then
         return 1
@@ -364,7 +387,13 @@ login_user() {
         return 1
     fi
     got="$(hash_password "$pass")"
-    [[ -n "$want" && "$got" == "$want" ]]
+    if [[ -n "$want" && "$got" == "$want" ]]; then
+        if uid="$(sqlite3 "$DB" "SELECT id FROM usuarios WHERE username='$esc';" 2>>"$ERRLOG")" && [[ -n "$uid" ]]; then
+            log_action "$uid" "$user" "$(printf 'login username="%s"' "$user")"
+        fi
+        return 0
+    fi
+    return 1
 }
 
 register_interactive() {
@@ -375,15 +404,23 @@ register_interactive() {
 }
 
 # @brief Login con 3 intentos (heredado de ejercicio-1).
+# @param $1 nombre de var donde dejar el uid, $2 nombre de var para el username.
 # @return 0 acceso / 1 denegado / 2 EOF.
 auth_interactive() {
+    local -n _uid_out="$1"
+    local -n _user_out="$2"
     local -i intentos=0
-    local user pass
+    local user pass esc uid
 
     while (( intentos < 3 )); do
         read -rp "Usuario: " user || return 2
         read -rsp "Contraseña: " pass || return 2; echo
         if login_user "$user" "$pass"; then
+            esc="$(sql_escape "$user")"
+            if uid="$(sqlite3 "$DB" "SELECT id FROM usuarios WHERE username='$esc';" 2>>"$ERRLOG")" && [[ -n "$uid" ]]; then
+                _uid_out="$uid"
+                _user_out="$user"
+            fi
             printf 'Acceso concedido.\n'
             return 0
         fi
@@ -394,10 +431,13 @@ auth_interactive() {
 }
 
 # @brief Menú de acceso: sin login o registro no se llega al inventario.
+# @param $1 nombre de var donde dejar el uid, $2 nombre de var para el username.
 # @return 0 login OK (entrar) / 1 salir o EOF.
 # @note El 1 de un fallo de validación NO sale del menú.
 auth_menu() {
-    local opt="" s=0
+    local -n _menu_uid="$1"
+    local -n _menu_user="$2"
+    local opt="" s=0 uid_tmp="" user_tmp=""
     while true; do
         printf '\nACCESO:\n'
         printf '1. Iniciar sesión\n'
@@ -406,8 +446,12 @@ auth_menu() {
         read -rp "Opción: " opt || return 1
         case "$opt" in
             1)
-                auth_interactive; s=$?
-                if (( s == 0 )); then return 0; fi
+                auth_interactive uid_tmp user_tmp; s=$?
+                if (( s == 0 )); then
+                    _menu_uid="$uid_tmp"
+                    _menu_user="$user_tmp"
+                    return 0
+                fi
                 if (( s == 2 )); then return 1; fi
                 ;;
             2)
@@ -423,8 +467,11 @@ auth_menu() {
 # ---- lib/report.sh ----
 
 # @brief Regenera el HTML desde cero (cabecera + una fila por registro).
+# @param $1 uid del operador, $2 username del operador (auditoría punto 5).
 # @note El HTML es derivado: siempre se puede borrar y regenerar.
 generate_report() {
+    local uid="$1"
+    local user="$2"
     local -A cache
     local id resto nombre precio
     load_table productos cache
@@ -444,6 +491,7 @@ generate_report() {
     done
     printf '</table>\n</body>\n</html>\n' >> "$PRODUCTS_HTML"
     printf 'Reporte generado en %s.\n' "$PRODUCTS_HTML"
+    log_action "$uid" "$user" "reporte"
 }
 
 # ---- lib/ui.sh ----
@@ -454,6 +502,8 @@ show_welcome() {
 }
 
 product_menu() {
+    local uid="$1"
+    local user="$2"
     local opt=""
     local id nombre precio
 
@@ -472,23 +522,23 @@ product_menu() {
                 read -rp "Ingrese ID: " id || return 0
                 read -rp "Ingrese Nombre: " nombre || return 0
                 read -rp "Ingrese Precio: " precio || return 0
-                add_product "$id" "$nombre" "$precio" || true
+                add_product "$id" "$nombre" "$precio" "$uid" "$user" || true
                 ;;
             "$OPT_REMOVE")
                 read -rp "Ingrese ID a eliminar: " id || return 0
-                remove_product "$id" || true
+                remove_product "$id" "$uid" "$user" || true
                 ;;
             "$OPT_LIST")
-                list_products
+                list_products "$uid" "$user"
                 ;;
             "$OPT_UPDATE")
                 read -rp "Ingrese ID a editar: " id || return 0
                 read -rp "Ingrese nuevo Nombre: " nombre || return 0
                 read -rp "Ingrese nuevo Precio: " precio || return 0
-                update_product "$id" "$nombre" "$precio" || true
+                update_product "$id" "$nombre" "$precio" "$uid" "$user" || true
                 ;;
             "$OPT_REPORT")
-                generate_report
+                generate_report "$uid" "$user"
                 ;;
             "$OPT_EXIT")
                 printf '\nSaliendo del programa...\n'
@@ -504,11 +554,12 @@ main() {
     init_db
     show_welcome
 
-    if ! auth_menu; then
+    local uid="" user=""
+    if ! auth_menu uid user; then
         printf '\nSaliendo del programa...\n'
         return 0
     fi
-    product_menu
+    product_menu "$uid" "$user"
 }
 
 main "$@"
