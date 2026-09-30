@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# bin/app — entrypoint flaco para desarrollo (usa lib/*).
+# Entregable Classroom sigue siendo ./ejercicio-3.sh (bundle generado con `make build`).
+# Uso: ./bin/app  |  APP_ROOT=. ./bin/app
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_DIR"
+
+# Orden canónico de carga (config primero, ui al final).
+# shellcheck disable=SC1091
+source lib/config.sh
+source lib/validators.sh
+source lib/crypto.sh
+source lib/logging.sh
+source lib/db.sh
+source lib/products.sh
+source lib/auth.sh
+source lib/report.sh
+source lib/ui.sh
+
+main "$@"
