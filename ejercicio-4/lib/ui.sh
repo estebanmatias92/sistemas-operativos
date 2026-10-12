@@ -1,0 +1,92 @@
+# lib/ui.sh — client CLI (heredado Lab 05, intacto para paridad) + dispatcher.
+# No toca disco directo; delega en casos de uso.
+# El dispatcher main() elige client: --tui (default, lib/tui.sh) o --cli.
+
+show_welcome() {
+    printf "Bienvenido al Sistema de Gestion de Inventario\n\n"
+}
+
+product_menu() {
+    local uid="$1"
+    local user="$2"
+    local opt=""
+    local id nombre precio
+
+    while [[ "$opt" != "$OPT_EXIT" ]]; do
+        printf '\nACCIONES:\n'
+        printf '1. Alta producto\n'
+        printf '2. Baja producto\n'
+        printf '3. Mostrar inventario\n'
+        printf '4. Editar producto\n'
+        printf '5. Generar reporte HTML\n'
+        printf '6. Salir\n'
+        read -rp "Opción: " opt || return 0
+
+        case "$opt" in
+            "$OPT_ADD")
+                read -rp "Ingrese ID: " id || return 0
+                read -rp "Ingrese Nombre: " nombre || return 0
+                read -rp "Ingrese Precio: " precio || return 0
+                add_product "$id" "$nombre" "$precio" "$uid" "$user" || true
+                ;;
+            "$OPT_REMOVE")
+                read -rp "Ingrese ID a eliminar: " id || return 0
+                remove_product "$id" "$uid" "$user" || true
+                ;;
+            "$OPT_LIST")
+                list_products "$uid" "$user"
+                ;;
+            "$OPT_UPDATE")
+                read -rp "Ingrese ID a editar: " id || return 0
+                read -rp "Ingrese nuevo Nombre: " nombre || return 0
+                read -rp "Ingrese nuevo Precio: " precio || return 0
+                update_product "$id" "$nombre" "$precio" "$uid" "$user" || true
+                ;;
+            "$OPT_REPORT")
+                generate_report "$uid" "$user"
+                ;;
+            "$OPT_EXIT")
+                printf '\nSaliendo del programa...\n'
+                ;;
+            *)
+                printf '\nOpción inválida.\n'
+                ;;
+        esac
+    done
+}
+
+print_usage() {
+    printf 'Uso: %s [--tui|--cli|--help]\n' "${0##*/}"
+    printf '  --tui    Interfaz whiptail (default; requiere TTY).\n'
+    printf '  --cli    Interfaz CLI heredada del Lab 05.\n'
+    printf '  --help   Muestra esta ayuda.\n'
+}
+
+cli_main() {
+    init_db
+    show_welcome
+
+    local uid="" user=""
+    if ! auth_menu uid user; then
+        printf '\nSaliendo del programa...\n'
+        return 0
+    fi
+    product_menu "$uid" "$user"
+}
+
+# @brief Dispatcher dual client (Lab 06). Sin args = --tui.
+main() {
+    local mode="--tui"
+    if (( $# > 0 )); then
+        case "${1:-}" in
+            --tui|--cli) mode="$1" ;;
+            --help|-h) print_usage; return 0 ;;
+            *) printf 'Opción desconocida: %s\n' "$1" >&2; print_usage; return 1 ;;
+        esac
+    fi
+    if [[ "$mode" == "--cli" ]]; then
+        cli_main
+    else
+        tui_main
+    fi
+}
