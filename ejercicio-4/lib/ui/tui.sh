@@ -1,13 +1,21 @@
-# lib/tui.sh — client TUI (whiptail). ÚNICO archivo nuevo del Lab 06.
-# No toca disco directo; delega en los mismos casos de uso que lib/ui.sh
-# (products/auth/report). Los casos puros nunca invocan whiptail directo:
-# la TUI captura su stdout/stderr y lo exhibe en --msgbox/--textbox.
+# lib/ui/tui.sh — client TUI (whiptail, capa UI). Única junto a cli.sh que
+# interactúa con el usuario. Delega en los mismos casos de la API; nunca
+# SQL directo (el uid post-login se resuelve vía auth_resolve_uid).
 #
 # Convenciones whiptail (ver AGENTS.md):
 # - El resultado va a stderr: se captura con swap 3>&1 1>&2 2>&3.
 # - exit != 0 = Cancel/Esc = abortar flujo y volver al menú
 #   (sin log_error, sin log_action, sin escribir).
 # - Cada llamada se protege con if/|| por set -e.
+
+[[ -n "${_UI_TUI_LOADED:-}" ]] && return 0
+declare -g _UI_TUI_LOADED=1
+
+if [[ -z "${OPT_ADD:-}" ]]; then
+    # shellcheck disable=SC1091
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)/lib/config.sh" 2>/dev/null \
+        || source "lib/config.sh" 2>/dev/null || true
+fi
 
 # @brief Verifica dependencia de --tui: whiptail instalado + TTY.
 # @return 0 ok / 1 falta dependencia (mensaje amable vía log_error).
@@ -85,7 +93,7 @@ tui_list_show() {
     rm -f "$tmp"
 }
 
-# @brief Alta de usuario en TUI (espejo de register_interactive de auth.sh).
+# @brief Alta de usuario en TUI (espejo de register_interactive de cli.sh).
 tui_register_interactive() {
     local user pass
     tui_input "Registro" "Nuevo usuario:" user || return 0
@@ -93,21 +101,20 @@ tui_register_interactive() {
     tui_run_show "Registro" register_user "$user" "$pass"
 }
 
-# @brief Login con 3 intentos (espejo de auth_interactive de auth.sh).
+# @brief Login con 3 intentos (espejo de auth_interactive de cli.sh).
 # @param $1 nombre de var donde dejar el uid, $2 nombre de var para el username.
 # @return 0 acceso / 1 denegado o Cancel (volver al menú, sin error).
 tui_auth_interactive() {
     local -n _uid_out="$1"
     local -n _user_out="$2"
     local -i intentos=0
-    local user pass esc uid
+    local user pass uid
 
     while (( intentos < 3 )); do
         tui_input "Acceso" "Usuario:" user || return 1
         tui_pass "Acceso" "Contraseña:" pass || return 1
         if login_user "$user" "$pass"; then
-            esc="$(sql_escape "$user")"
-            if uid="$(sqlite3 "$DB" "SELECT id FROM usuarios WHERE username='$esc';" 2>>"$ERRLOG")" && [[ -n "$uid" ]]; then
+            if uid="$(auth_resolve_uid "$user")" && [[ -n "$uid" ]]; then
                 _uid_out="$uid"
                 _user_out="$user"
             fi
@@ -120,13 +127,13 @@ tui_auth_interactive() {
     return 1
 }
 
-# @brief Menú de acceso en TUI (espejo de auth_menu de auth.sh).
+# @brief Menú de acceso en TUI (espejo de auth_menu de cli.sh).
 # @param $1 nombre de var donde dejar el uid, $2 nombre de var para el username.
 # @return 0 login OK (entrar) / 1 salir o Cancel/Esc.
 tui_auth_menu() {
     local -n _menu_uid="$1"
     local -n _menu_user="$2"
-    local opt s uid_tmp="" user_tmp=""
+    local opt uid_tmp="" user_tmp=""
     while true; do
         if ! opt="$(whiptail --title "Acceso" --menu "Elija una opción:" 15 50 3 1 "Iniciar sesión" 2 "Registrar usuario" 3 "Salir" 3>&1 1>&2 2>&3)"; then
             return 1
@@ -147,7 +154,7 @@ tui_auth_menu() {
     done
 }
 
-# @brief Menú de inventario en TUI (espejo de product_menu de ui.sh).
+# @brief Menú de inventario en TUI (espejo de product_menu de cli.sh).
 # @param $1 uid del operador, $2 username del operador.
 tui_product_menu() {
     local uid="$1"
@@ -162,10 +169,9 @@ tui_product_menu() {
 
         case "$opt" in
             "$OPT_ADD")
-                tui_input "Alta" "Ingrese ID:" id || continue
                 tui_input "Alta" "Ingrese Nombre:" nombre || continue
                 tui_input "Alta" "Ingrese Precio:" precio || continue
-                tui_run_show "Alta" add_product "$id" "$nombre" "$precio" "$uid" "$user"
+                tui_run_show "Alta" add_product "$nombre" "$precio" "$uid" "$user"
                 ;;
             "$OPT_REMOVE")
                 tui_input "Baja" "Ingrese ID a eliminar:" id || continue
@@ -188,18 +194,4 @@ tui_product_menu() {
                 ;;
         esac
     done
-}
-
-# @brief Entrada TUI: exige whiptail+TTY, luego mismo flujo que cli_main.
-tui_main() {
-    tui_require || return 1
-    init_db
-    tui_msg "Bienvenida" "Bienvenido al Sistema de Gestion de Inventario"
-
-    local uid="" user=""
-    if ! tui_auth_menu uid user; then
-        tui_msg "Salida" "Saliendo del programa..."
-        return 0
-    fi
-    tui_product_menu "$uid" "$user"
 }

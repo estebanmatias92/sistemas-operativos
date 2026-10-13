@@ -30,3 +30,6 @@ Thumbs.db
 *.tmp
 *.temp
 *.orig
+
+# dist/ — bundle monolítico opcional vía `make dist` (emergencia single-file; no es el entregable)
+dist/*.sh

@@ -1,5 +1,15 @@
 # lib/logging.sh — cross-cutting. Cualquier capa lo llama; nunca importa ui ni db.
 # Formato system.log: fecha/hora<TAB>id<TAB>usuario<TAB>acción
+# Guarda/pragma + auto-source defensivo de config (modo modular standalone).
+
+[[ -n "${_LOGGING_LOADED:-}" ]] && return 0
+declare -g _LOGGING_LOADED=1
+
+if [[ -z "${LOG:-}" || -z "${ERRLOG:-}" ]]; then
+    # shellcheck disable=SC1091
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/lib/config.sh" 2>/dev/null \
+        || source "lib/config.sh" 2>/dev/null || true
+fi
 
 # @brief Adjunta una línea de auditoría.
 # @param $1 id, $2 usuario, $3 acción.

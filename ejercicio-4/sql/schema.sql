@@ -1,13 +1,13 @@
--- sql/schema.sql — fuente canónica SQL (Lab 05).
--- init_db() en lib/db.sh (hoy TSV) y en lib/db_sqlite.sh (Fase SQLite) deben
--- mantenerse compatibles con este schema. Espejo del heredoc de AGENTS.md.
+-- sql/schema.sql — fuente canónica SQL.
+-- El ÚNICO que la aplica es scripts/deploy.sh (`make init`); la app solo require_db.
+-- IDs autogenerados en ambas tablas (el alta nunca pide id manual).
 CREATE TABLE IF NOT EXISTS usuarios(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
   hash TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS productos(
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   nombre TEXT NOT NULL,
   precio TEXT NOT NULL
 );

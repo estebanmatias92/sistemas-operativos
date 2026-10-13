@@ -1,5 +1,5 @@
 # tests/report.bats — ejecuta: make test
-# Cubre lib/report.sh: HTML derivado con tabla ID/Nombre/Precio desde SQLite.
+# Cubre lib/api/report_api.sh: HTML derivado con tabla ID/Nombre/Precio desde SQLite.
 
 setup() {
   TMPDIR_TEST="$(mktemp -d)"
@@ -11,18 +11,20 @@ setup() {
   source "$BATS_TEST_DIRNAME/../lib/validators.sh"
   source "$BATS_TEST_DIRNAME/../lib/crypto.sh"
   source "$BATS_TEST_DIRNAME/../lib/logging.sh"
-  source "$BATS_TEST_DIRNAME/../lib/db.sh"
-  source "$BATS_TEST_DIRNAME/../lib/products.sh"
-  source "$BATS_TEST_DIRNAME/../lib/report.sh"
-  init_db
+  source "$BATS_TEST_DIRNAME/../lib/model/db.sh"
+  source "$BATS_TEST_DIRNAME/../lib/model/products_store.sh"
+  source "$BATS_TEST_DIRNAME/../lib/model/users_store.sh"
+  source "$BATS_TEST_DIRNAME/../lib/api/products_api.sh"
+  source "$BATS_TEST_DIRNAME/../lib/api/report_api.sh"
+  "$BATS_TEST_DIRNAME/../scripts/deploy.sh" --no-seed >/dev/null
 }
 
 teardown() {
   rm -rf "$TMPDIR_TEST"
 }
 
-@test "generate_report crea HTML con cabecera y fila" {
-  add_product "1" "escoba" "3000" "1" "u1" >/dev/null
+@test "generate_report crea HTML con cabecera y fila (id autogenerado)" {
+  add_product "escoba" "3000" "1" "u1" >/dev/null
   run generate_report "1" "u1"
   [ "$status" -eq 0 ]
   grep -q "<title>Productos</title>" "$PRODUCTS_HTML"
