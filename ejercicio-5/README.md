@@ -62,8 +62,16 @@ make test                 # suite bats (sin TTY)
 ./server.sh --check       # dependencias del servidor web
 ```
 
-Seed de ejemplo: usuarios `matt` y `jeff` con contraseña `12345`; productos
-`escoba` y `balde`.
+### Credenciales de acceso
+
+El seed de `make init` crea estas cuentas:
+
+| Usuario | Contraseña | Uso |
+|---|---|---|
+| `matt` | `12345` | cuenta de prueba |
+| `jeff` | `12345` | cuenta de prueba |
+
+Productos sembrados: `escoba` y `balde`. También se puede registrar una cuenta nueva desde la UI. Son credenciales **solo para el entorno local del lab**.
 
 ### Interfaz web
 
@@ -76,6 +84,7 @@ HTTP_SERVER_HOST=127.0.0.1 ./server.sh
 
 Abrí `http://localhost:8080/`. La UI permite registrarse, iniciar sesión,
 listar/agregar/editar/eliminar productos y generar el reporte HTML.
+Ingresá con `matt` / `12345` o creá una cuenta desde el registro.
 
 > Por defecto escucha en `0.0.0.0` (como el ejemplo del profesor), así que es
 > accesible desde la red local. Para uso exclusivamente local:
