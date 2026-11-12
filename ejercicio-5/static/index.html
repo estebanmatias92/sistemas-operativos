@@ -4,15 +4,144 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Inventario — Servidor activo</title>
+    <meta name="description" content="Gestión de inventario — Sistemas Operativos ISFT Nº 151">
+    <title>Inventario — Gestión de productos</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 
 <body>
-    <main>
-        <h1>Inventario</h1>
-        <p>Servidor HTTP/JSON-RPC activo. La interfaz completa se habilita en el
-            checkpoint de UI.</p>
+    <header class="app-header">
+        <div class="brand">
+            <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Z" fill="none" stroke="currentColor"
+                    stroke-width="1.8" stroke-linejoin="round" />
+                <path d="M3 7.5 12 12l9-4.5M12 12v9" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linejoin="round" />
+            </svg>
+            <span>Inventario</span>
+        </div>
+        <div class="session-box" id="session-box" hidden>
+            <span class="session-user" id="session-user"></span>
+            <button type="button" class="btn btn-ghost" id="logout-btn">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <section class="auth-view" id="auth-view">
+            <div class="card auth-card">
+                <h1>Acceso al sistema</h1>
+                <p class="muted">Ingresá para administrar el inventario de productos.</p>
+
+                <div class="tabs" role="tablist" aria-label="Acceso">
+                    <button type="button" class="tab is-active" role="tab" aria-selected="true"
+                        data-tab="login">Iniciar sesión</button>
+                    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="register">Crear
+                        cuenta</button>
+                </div>
+
+                <form class="auth-form" id="login-form" autocomplete="on">
+                    <label class="field">
+                        <span>Usuario</span>
+                        <input type="text" name="username" autocomplete="username" required>
+                    </label>
+                    <label class="field">
+                        <span>Contraseña</span>
+                        <input type="password" name="password" autocomplete="current-password" required>
+                    </label>
+                    <button type="submit" class="btn btn-primary">Ingresar</button>
+                </form>
+
+                <form class="auth-form" id="register-form" autocomplete="on" hidden>
+                    <label class="field">
+                        <span>Usuario</span>
+                        <input type="text" name="username" autocomplete="username" required minlength="1"
+                            pattern="[A-Za-z0-9_.-]+"
+                            title="Solo letras, números, punto, guion y guion bajo.">
+                    </label>
+                    <label class="field">
+                        <span>Contraseña</span>
+                        <input type="password" name="password" autocomplete="new-password" required minlength="1">
+                    </label>
+                    <label class="field">
+                        <span>Repetir contraseña</span>
+                        <input type="password" name="password2" autocomplete="new-password" required minlength="1">
+                    </label>
+                    <button type="submit" class="btn btn-primary">Crear cuenta</button>
+                </form>
+
+                <p class="status" id="auth-status" role="status" aria-live="polite"></p>
+            </div>
+        </section>
+
+        <section class="workspace" id="workspace" hidden>
+            <div class="workspace-head">
+                <div>
+                    <h1>Productos</h1>
+                    <p class="muted" id="inventory-summary">Cargando inventario…</p>
+                </div>
+                <div class="workspace-actions">
+                    <button type="button" class="btn btn-secondary" id="report-btn">Generar reporte</button>
+                    <button type="button" class="btn btn-ghost" id="refresh-btn">Actualizar</button>
+                </div>
+            </div>
+
+            <div class="workspace-grid">
+                <aside class="card form-card">
+                    <h2 id="product-form-title">Nuevo producto</h2>
+                    <form id="product-form">
+                        <input type="hidden" name="id">
+                        <label class="field">
+                            <span>Nombre</span>
+                            <input type="text" name="nombre" required maxlength="120" autocomplete="off"
+                                placeholder="Ej.: escoba">
+                        </label>
+                        <label class="field">
+                            <span>Precio</span>
+                            <input type="text" name="precio" required inputmode="decimal" autocomplete="off"
+                                pattern="[0-9]+(\.[0-9]{1,2})?" title="Entero o hasta 2 decimales."
+                                placeholder="Ej.: 3000 o 3000.50">
+                        </label>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="product-submit">Agregar</button>
+                            <button type="button" class="btn btn-ghost" id="cancel-edit-btn" hidden>Cancelar</button>
+                        </div>
+                        <p class="hint">El precio admite enteros o hasta dos decimales.</p>
+                    </form>
+                </aside>
+
+                <section class="card table-card" aria-labelledby="table-title">
+                    <div class="table-head">
+                        <h2 id="table-title">Inventario</h2>
+                        <span class="badge" id="product-count">0 productos</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Nombre</th>
+                                    <th scope="col" class="num">Precio</th>
+                                    <th scope="col" class="actions-col">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-body"></tbody>
+                        </table>
+                    </div>
+                    <p class="empty-state" id="products-empty" hidden>No hay productos cargados todavía.</p>
+                </section>
+            </div>
+
+            <p class="status" id="app-status" role="status" aria-live="polite"></p>
+        </section>
     </main>
+
+    <footer class="app-footer">
+        <span>Sistemas Operativos — ISFT Nº 151</span>
+        <span>HTTP + JSON-RPC 2.0</span>
+    </footer>
+
+    <script src="/app.js" defer></script>
 </body>
 
 </html>
