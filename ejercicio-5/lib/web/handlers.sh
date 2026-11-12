@@ -95,3 +95,113 @@ rpc_handle_auth_logout() {
     fi
     rpc_success '{"ok":true}'
 }
+
+# @brief products.list (privado): inventario como array JSON.
+# @params {token}
+# @result {products: [{id, nombre, precio}]}
+rpc_handle_products_list() {
+    local rows json
+
+    rows="$(list_products_data "$RPC_SESSION_UID" "$RPC_SESSION_USER")" || {
+        rpc_internal_error
+        return 0
+    }
+    if [[ -z "$rows" ]]; then
+        json='[]'
+    else
+        json="$(printf '%s\n' "$rows" | jq -Rsc '
+            split("\n")
+            | map(select(length > 0) | split("\t") | {id: (.[0] | tonumber), nombre: .[1], precio: .[2]})')"
+    fi
+    rpc_success "$(jq -nc --argjson products "$json" '{products: $products}')"
+}
+
+# @brief products.add (privado): alta con id autogenerado.
+# @params {token, nombre, precio}
+# @result {id, nombre, precio}
+rpc_handle_products_add() {
+    local nombre precio out rc=0 id
+
+    if ! jq -e '(.nombre | type == "string") and (.precio | type == "string")' \
+        >/dev/null 2>&1 <<<"$RPC_REQUEST_PARAMS"; then
+        rpc_invalid_params "nombre y precio deben ser strings."
+        return 0
+    fi
+    nombre="$(jq -r '.nombre' <<<"$RPC_REQUEST_PARAMS")"
+    precio="$(jq -r '.precio' <<<"$RPC_REQUEST_PARAMS")"
+
+    out="$(add_product_data "$nombre" "$precio" "$RPC_SESSION_UID" "$RPC_SESSION_USER")" || rc=$?
+    case "$rc" in
+        0)
+            id="$out"
+            rpc_success "$(jq -nc \
+                --argjson id "$id" \
+                --arg nombre "$nombre" \
+                --arg precio "$precio" \
+                '{id: $id, nombre: $nombre, precio: $precio}')"
+            ;;
+        10) rpc_invalid_params "nombre o precio inválidos." ;;
+        *) rpc_internal_error ;;
+    esac
+}
+
+# @brief products.update (privado): edición quirúrgica por id.
+# @params {token, id, nombre, precio}
+# @result {id, nombre, precio}
+rpc_handle_products_update() {
+    local id nombre precio out rc=0
+
+    if ! jq -e '(.id | type == "number" or type == "string")
+        and (.nombre | type == "string")
+        and (.precio | type == "string")' >/dev/null 2>&1 <<<"$RPC_REQUEST_PARAMS"; then
+        rpc_invalid_params "id, nombre y precio requeridos."
+        return 0
+    fi
+    id="$(jq -r '.id' <<<"$RPC_REQUEST_PARAMS")"
+    nombre="$(jq -r '.nombre' <<<"$RPC_REQUEST_PARAMS")"
+    precio="$(jq -r '.precio' <<<"$RPC_REQUEST_PARAMS")"
+
+    if ! is_valid_ref_id "$id"; then
+        rpc_invalid_params "id debe ser un entero positivo."
+        return 0
+    fi
+
+    out="$(update_product_data "$id" "$nombre" "$precio" "$RPC_SESSION_UID" "$RPC_SESSION_USER")" || rc=$?
+    case "$rc" in
+        0)
+            rpc_success "$(jq -nc \
+                --argjson id "$id" \
+                --arg nombre "$nombre" \
+                --arg precio "$precio" \
+                '{id: $id, nombre: $nombre, precio: $precio}')"
+            ;;
+        10) rpc_invalid_params "nombre o precio inválidos." ;;
+        11) rpc_not_found "El producto no existe." ;;
+        *) rpc_internal_error ;;
+    esac
+}
+
+# @brief products.remove (privado): baja por id.
+# @params {token, id}
+# @result {id}
+rpc_handle_products_remove() {
+    local id out rc=0
+
+    if ! jq -e '(.id | type == "number" or type == "string")' \
+        >/dev/null 2>&1 <<<"$RPC_REQUEST_PARAMS"; then
+        rpc_invalid_params "id requerido."
+        return 0
+    fi
+    id="$(jq -r '.id' <<<"$RPC_REQUEST_PARAMS")"
+    if ! is_valid_ref_id "$id"; then
+        rpc_invalid_params "id debe ser un entero positivo."
+        return 0
+    fi
+
+    out="$(remove_product_data "$id" "$RPC_SESSION_UID" "$RPC_SESSION_USER")" || rc=$?
+    case "$rc" in
+        0) rpc_success "$(jq -nc --argjson id "$out" '{id: $id}')" ;;
+        11) rpc_not_found "El producto no existe." ;;
+        *) rpc_internal_error ;;
+    esac
+}

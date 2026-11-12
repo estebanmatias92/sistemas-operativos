@@ -157,6 +157,10 @@ rpc_load_registry() {
     RPC_PUBLIC_HANDLER['auth.register']='rpc_handle_auth_register'
     RPC_PUBLIC_HANDLER['auth.login']='rpc_handle_auth_login'
     RPC_PRIVATE_HANDLER['auth.logout']='rpc_handle_auth_logout'
+    RPC_PRIVATE_HANDLER['products.list']='rpc_handle_products_list'
+    RPC_PRIVATE_HANDLER['products.add']='rpc_handle_products_add'
+    RPC_PRIVATE_HANDLER['products.update']='rpc_handle_products_update'
+    RPC_PRIVATE_HANDLER['products.remove']='rpc_handle_products_remove'
 }
 
 # @brief Resuelve el método y ejecuta el handler (público o privado).
