@@ -54,6 +54,9 @@ ejercicio-5/
     web/                # http.sh, rpc.sh, handlers.sh, session.sh, dispatch.sh
   static/               # index.html, app.js, styles.css, favicon.ico
   sql/, scripts/, tests/, var/
+  docs/                 # deep-dive: 01-arquitectura .. 05-decisiones + README
+    diagrams/           # *.puml (fuente) + *.svg (compilado, versionado)
+    assets/             # capturas de la UI (login, inventario)
   bash-web-rpc-server/  # ejemplo del profesor (intacto)
 ```
 
@@ -124,6 +127,16 @@ Códigos de retorno de `*_data` (los handlers mapean a códigos RPC sin duplicar
 - Targets nuevos: `run-web` (`./server.sh`), `run-web-dev` (`./bin/server`); `build`/`check`/`fmt` incluyen `server.sh`, `bin/server` y `lib/web/*.sh`.
 - `check` debe verificar: `bash -n` de entrypoints y módulos; `sqlite3` solo en `lib/model`; `whiptail` solo en `lib/ui`; `read -rp`/`read -rsp` solo en `lib/ui`; `socat` solo en `bin/server`/`lib/web/dispatch.sh`; `jq` solo en `lib/web`.
 - `make init` sigue siendo el único dueño de `data.sq3`; `make test` corre bats sin TTY.
+- `make docs` compila `docs/diagrams/*.puml` a SVG e inyecta el fondo blanco (`<rect class="docs-background">`); `make docs-check` valida sintaxis y solo avisa si falta `plantuml`.
+
+## Documentación (docs-as-code)
+
+- `docs/03-referencia.md` es el **contrato canónico** de HTTP/RPC, códigos, env vars y formatos. Si cambia un método, un código, un status, una variable o un formato, se actualiza ahí primero.
+- Los diagramas son PlantUML: la fuente es `docs/diagrams/*.puml`; el SVG se **regenera** con `make docs` y se versiona. No editar SVG a mano.
+- Si cambia un flujo o una frontera de capas, actualizar el `.puml` correspondiente y regenerar; si además cambia el contrato, actualizar `03-referencia.md`.
+- `docs/assets/` son capturas ilustrativas de la UI real (no forman parte del contrato).
+- `plantuml`/`java`/GraphViz son dependencias **solo de documentación**, nunca del runtime ni de `make check`.
+- Mantener los enlaces relativos entre `docs/*.md` y hacia `../README.md`/`../AGENTS.md`; el índice es `docs/README.md`.
 
 ## Verificación
 

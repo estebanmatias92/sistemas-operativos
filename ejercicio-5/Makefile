@@ -2,7 +2,7 @@
 # Convención: todo target con ## aparece en help.
 SHELL := /usr/bin/env bash
 
-.PHONY: help build dist test check fmt run run-cli run-dist run-web run-web-dev init schema-check seed clean clean-all
+.PHONY: help build dist test check fmt docs docs-check run run-cli run-dist run-web run-web-dev init schema-check seed clean clean-all
 
 help: ## Muestra comandos disponibles
 	@grep -E '^[a-z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -48,6 +48,22 @@ check: ## bash -n (gate) + reglas de capas + shfmt informativo
 
 fmt: ## Formatea entrypoints + lib con shfmt (4 espacios, como el lab)
 	shfmt -w -i 4 -ci bin/app bin/server ejercicio-5.sh server.sh lib/*.sh lib/*/*.sh
+
+docs: ## Compila los diagramas PlantUML (docs/diagrams/*.puml -> *.svg)
+	@command -v plantuml >/dev/null 2>&1 || { echo "falta plantuml (pacman -S plantuml)"; exit 1; }
+	plantuml --svg --charset UTF-8 --disable-metadata --stop-on-error docs/diagrams/*.puml
+	@for f in docs/diagrams/*.svg; do \
+	  grep -q 'docs-background' "$$f" \
+	    || sed -i 's|<defs/>|<defs/><rect class="docs-background" width="100%" height="100%" fill="#FFFFFF"/>|' "$$f"; \
+	done
+	@echo "docs OK: $$(ls docs/diagrams/*.svg | wc -l) SVG (fondo blanco inyectado)"
+
+docs-check: ## Valida la sintaxis de los diagramas (aviso si falta plantuml)
+	@if command -v plantuml >/dev/null 2>&1; then \
+	  plantuml --check-syntax --charset UTF-8 docs/diagrams/*.puml && echo "docs-check OK"; \
+	else \
+	  echo "(aviso) plantuml no está instalado; se omite la validación de diagramas"; \
+	fi
 
 run: ## Corre app modular en TUI (bin/app + lib, default --tui)
 	./bin/app --tui

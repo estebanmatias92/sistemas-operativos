@@ -24,6 +24,22 @@ bin/server (web) ─────┘          │
   compartida**. La sesión vive en `var/session/sessions.tsv` y los datos en
   SQLite.
 
+## Documentación
+
+La documentación profunda vive en [`docs/`](docs/README.md):
+
+| Documento | Contenido |
+|---|---|
+| [01 — Arquitectura](docs/01-arquitectura.md) | capas, módulos, topología y archivos |
+| [02 — Flujos](docs/02-flujos.md) | ciclo HTTP, RPC privado, sesión y reporte |
+| [03 — Referencia](docs/03-referencia.md) | contrato HTTP/RPC, códigos, env vars y formatos |
+| [04 — Operación](docs/04-operacion.md) | arranque, runbook, backup y seguridad |
+| [05 — Decisiones](docs/05-decisiones.md) | ADRs y alternativas descartadas |
+
+Los diagramas son docs-as-code: fuentes PlantUML en
+[`docs/diagrams/`](docs/diagrams/README.md), compiladas a SVG con `make docs`.
+Las capturas de la UI están en [`docs/assets/`](docs/assets/).
+
 ## Dependencias
 
 ```bash
@@ -78,40 +94,17 @@ auditoría y reporte que el Lab 06 (verificado por regresión y por los tests).
 
 ## Superficie RPC
 
-`POST /` con `Content-Type: application/json`. Todos los errores de aplicación
+`POST /` con `Content-Type: application/json`. Los errores de aplicación
 responden **HTTP 200** con envelope `error`; solo los fallos de
 transporte/estáticos usan 4xx.
 
-| Método | Tipo | params | result |
-|---|---|---|---|
-| `saludar` | público | — | `"Saludos desde el servidor en bash!"` |
-| `auth.register` | público | `{username, password}` | `{uid, username}` |
-| `auth.login` | público | `{username, password}` | `{token, uid, username, expires_at}` |
-| `auth.logout` | privado | `{token}` | `{ok: true}` |
-| `products.list` | privado | `{token}` | `{products: [{id, nombre, precio}]}` |
-| `products.add` | privado | `{token, nombre, precio}` | `{id, nombre, precio}` |
-| `products.update` | privado | `{token, id, nombre, precio}` | `{id, nombre, precio}` |
-| `products.remove` | privado | `{token, id}` | `{id}` |
-| `report.generate` | privado | `{token}` | `{path, url}` |
+- **Públicos:** `saludar`, `auth.register`, `auth.login`.
+- **Privados** (requieren `params.token`): `auth.logout`, `products.list`,
+  `products.add`, `products.update`, `products.remove`, `report.generate`.
 
-El token viaja en `params.token` (no hay cookies ni CORS: mismo origen).
-
-### Códigos de error
-
-| Código | Significado |
-|---|---|
-| `-32700` | JSON inválido |
-| `-32600` | request inválido (sin `method`, `jsonrpc` ≠ `2.0`, batch) |
-| `-32601` | método inexistente |
-| `-32602` | params inválidos |
-| `-32603` | error interno |
-| `-32001` | no autorizado / token ausente, inválido o vencido |
-| `-32002` | credenciales inválidas |
-| `-32003` | producto inexistente |
-| `-32004` | usuario duplicado |
-| `-32005` | método HTTP no permitido |
-
-### Ejemplos con `curl`
+El token viaja en `params.token` (sin cookies ni CORS: mismo origen). El
+contrato completo —params, results, códigos `-32xxx` y ejemplos por método—
+está en [`docs/03-referencia.md`](docs/03-referencia.md#superficie-rpc).
 
 ```bash
 # Saludo (público)
@@ -119,37 +112,15 @@ curl -s -X POST http://localhost:8080/ \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"saludar"}'
 
-# Registro y login
-curl -s -X POST http://localhost:8080/ \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"auth.register","params":{"username":"ana","password":"secreto"}}'
-
+# Login -> token para los métodos privados
 TOKEN=$(curl -s -X POST http://localhost:8080/ \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"auth.login","params":{"username":"ana","password":"secreto"}}' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"auth.login","params":{"username":"matt","password":"12345"}}' \
   | jq -r '.result.token')
 
-# CRUD
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"products.add\",\"params\":{\"token\":\"$TOKEN\",\"nombre\":\"escoba\",\"precio\":\"3000\"}}"
-
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"products.list\",\"params\":{\"token\":\"$TOKEN\"}}"
-
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"products.update\",\"params\":{\"token\":\"$TOKEN\",\"id\":1,\"nombre\":\"escoba nueva\",\"precio\":\"3500\"}}"
-
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"products.remove\",\"params\":{\"token\":\"$TOKEN\",\"id\":1}}"
-
-# Reporte: devuelve {path, url}; se sirve en /report/productos.html
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"report.generate\",\"params\":{\"token\":\"$TOKEN\"}}"
-curl -s http://localhost:8080/report/productos.html
-
-# Logout
-curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"auth.logout\",\"params\":{\"token\":\"$TOKEN\"}}"
+curl -s -X POST http://localhost:8080/ \
+  -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"products.list\",\"params\":{\"token\":\"$TOKEN\"}}"
 ```
 
 ## HTTP estático
@@ -166,26 +137,31 @@ path traversal devuelve `404`. Otros métodos HTTP responden `-32005` con HTTP
 
 ## Sesión
 
-- Archivo: `var/session/sessions.tsv` (`token<TAB>uid<TAB>username<TAB>expires_at`).
-- Token: 32 bytes de `/dev/urandom` hasheados con SHA-256 (64 hex).
-- TTL: `SESSION_TTL` (default 3600 s = 1 h).
-- Concurrencia: `flock` compartido para validar, exclusivo para crear/revocar/
-  limpiar; revocación y limpieza con archivo temporal + `mv`.
-- Permisos: directorio `700`, archivo `600`.
-- `var/session/` está en `.gitignore`. Los tokens y contraseñas **nunca** se
-  escriben en `system.log`/`error.log` ni se devuelven en errores.
+Sesiones fork-safe en `var/session/sessions.tsv`
+(`token<TAB>uid<TAB>username<TAB>expires_at`): token de 32 bytes de
+`/dev/urandom` hasheado con SHA-256, TTL `SESSION_TTL` (default 3600 s) y
+`flock` compartido para validar / exclusivo para crear, revocar y limpiar.
+Directorio `700`, archivo `600`; `var/session/` está en `.gitignore` y los
+tokens y contraseñas **nunca** se escriben en `system.log`/`error.log`.
+
+Ciclo de vida y concurrencia: [`docs/02-flujos.md`](docs/02-flujos.md#ciclo-de-sesión).
 
 ## Seguridad
 
 - Contraseñas con SHA-256; nunca texto plano en disco ni en respuestas.
-- SQL siempre por la capa model (`sql_escape`, valores escapados, una sentencia
-  por invocación); la web no arma SQL.
+- SQL solo en la capa model (`sql_escape`, una sentencia por invocación); la
+  web no arma SQL.
 - `jq` para parsear/serializar JSON; no se evalúan strings del cliente.
-- No se loguean request bodies (pueden contener contraseñas).
-- UI sin `innerHTML` para datos: los productos se pintan con `textContent`.
-- Sin CORS y sin cookies: el token vive en `sessionStorage` y viaja en
+- No se loguean request bodies (pueden contener contraseñas) ni se usa
+  `innerHTML` para datos: los productos se pintan con `textContent`.
+- Sin CORS ni cookies: el token vive en `sessionStorage` y viaja en
   `params.token`.
-- **No hay TLS**: para exponer fuera de la red local, usar un reverse proxy.
+- **Sin TLS**: para uso local `HTTP_SERVER_HOST=127.0.0.1`; para exponer fuera
+  de la red, reverse proxy con HTTPS.
+
+Checklist y amenazas consideradas:
+[`docs/04-operacion.md`](docs/04-operacion.md#seguridad) ·
+[`docs/05-decisiones.md`](docs/05-decisiones.md).
 
 ## Tests
 
@@ -228,6 +204,9 @@ static/               # index.html, app.js, styles.css, favicon.ico
 sql/                  # schema.sql, seed.sql
 scripts/deploy.sh     # ÚNICO dueño de data.sq3 (`make init`)
 tests/                # *.bats
+docs/                 # arquitectura, flujos, referencia, operación, ADRs
+  diagrams/           # fuentes .puml + SVG compilados (docs-as-code)
+  assets/             # capturas de la UI
 var/                  # db, log, report, session (session gitignorado)
 bash-web-rpc-server/  # ejemplo del profesor (intacto, referencia)
 ```
@@ -246,6 +225,8 @@ make run-dist      # stub ./ejercicio-5.sh
 make run-web       # stub ./server.sh
 make run-web-dev   # ./bin/server
 make dist          # bundle single-file opcional para CLI/TUI
+make docs          # compila docs/diagrams/*.puml -> *.svg
+make docs-check    # valida sintaxis de los diagramas
 make clean         # logs + reporte + sesiones
 ```
 
