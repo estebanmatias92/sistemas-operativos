@@ -17,6 +17,21 @@ declare -g LOG="${LOG:-var/log/system.log}"
 declare -g ERRLOG="${ERRLOG:-var/log/error.log}"
 declare -g PRODUCTS_HTML="${PRODUCTS_HTML:-var/report/productos.html}"
 
+# --- Servidor web (host/puerto configurables por env; spec inmutable) ---
+declare -g HTTP_SERVER_HOST="${HTTP_SERVER_HOST:-0.0.0.0}"
+declare -g HTTP_SERVER_PORT="${HTTP_SERVER_PORT:-8080}"
+declare -g HTTP_STATIC_PATH="${HTTP_STATIC_PATH:-static}"
+declare -gr HTTP_DEFAULT_PATH="index.html"
+declare -gr HTTP_REPORT_PREFIX="report"
+declare -gri HTTP_MAX_REQUEST_BODY_SIZE=524288 # 512 KB
+declare -gr HTTP_SERVER_VERSION="v1.0.0"
+
+# --- Sesión web (fork-safe: archivo, no memoria compartida) ---
+declare -g SESSION_DIR="${SESSION_DIR:-var/session}"
+declare -g SESSIONS_FILE="${SESSIONS_FILE:-$SESSION_DIR/sessions.tsv}"
+declare -g SESSION_TTL="${SESSION_TTL:-3600}"
+declare -gr SESSION_LOCK="${SESSIONS_FILE}.lock"
+
 # --- Rutas de deploy (fuente canónica SQL + script dueño de la DB) ---
 declare -gr SCHEMA_SQL="sql/schema.sql"
 declare -gr SEED_SQL="sql/seed.sql"

@@ -2,13 +2,13 @@
 # Convención: todo target con ## aparece en help.
 SHELL := /usr/bin/env bash
 
-.PHONY: help build dist test check fmt run run-cli run-dist init schema-check seed clean clean-all
+.PHONY: help build dist test check fmt run run-cli run-dist run-web run-web-dev init schema-check seed clean clean-all
 
 help: ## Muestra comandos disponibles
 	@grep -E '^[a-z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-build: check ## Verifica (el entregable ./ejercicio-5.sh es stub delgado, sin compilado)
-	bash -n ejercicio-5.sh bin/app && echo "build OK: stub + lib/"
+build: check ## Verifica (entregables ./ejercicio-5.sh y ./server.sh son stubs delgados)
+	bash -n ejercicio-5.sh server.sh bin/app bin/server && echo "build OK: stubs + lib/"
 
 dist: ## Genera bundle monolítico opcional en dist/ (solo emergencia single-file; gitignorado)
 	@mkdir -p dist
@@ -29,21 +29,25 @@ dist: ## Genera bundle monolítico opcional en dist/ (solo emergencia single-fil
 test: ## Corre suite bats (tests/*.bats)
 	bats tests/
 
-check: ## bash -n (gate) + regla de capas ui->api->model + shfmt informativo
+check: ## bash -n (gate) + reglas de capas + shfmt informativo
 	bash -n bin/app
+	bash -n bin/server
 	bash -n scripts/deploy.sh
-	for f in lib/config.sh lib/validators.sh lib/crypto.sh lib/logging.sh lib/model/*.sh lib/api/*.sh lib/ui/*.sh; do bash -n "$$f" || exit 1; done
+	for f in lib/config.sh lib/validators.sh lib/crypto.sh lib/logging.sh lib/model/*.sh lib/api/*.sh lib/ui/*.sh lib/web/*.sh; do bash -n "$$f" || exit 1; done
 	bash -n ejercicio-5.sh
+	bash -n server.sh
 	@echo "-- regla de capas: sqlite3 solo en model/, whiptail/read solo en ui/"
-	@if grep -rn 'sqlite3' lib/api lib/ui bin 2>/dev/null | grep -v '#.*sqlite3'; then echo "CAPAS-FAIL: sqlite3 fuera de lib/model"; exit 1; fi
-	@if grep -rn 'whiptail' lib/api lib/model lib/config.sh lib/validators.sh lib/crypto.sh lib/logging.sh 2>/dev/null | grep -v '#.*whiptail'; then echo "CAPAS-FAIL: whiptail fuera de lib/ui"; exit 1; fi
-	@if grep -rn 'read -rp\|read -rsp' lib/api lib/model 2>/dev/null | grep -v '#.*read -r'; then echo "CAPAS-FAIL: read interactivo fuera de lib/ui"; exit 1; fi
-	@echo "-- capas OK (ui -> api -> model -> config)"
-	shfmt -d -i 4 -ci bin/app lib/*.sh lib/*/*.sh || echo "(aviso) shfmt sugiere formato; el estilo del lab usa '>> \"$$f\"' con espacio, se mantiene a propósito"
+	@if grep -rnE '(^|[^[:alnum:]_])sqlite3[[:space:]]' lib/api lib/ui lib/web bin 2>/dev/null | grep -v '#.*sqlite3'; then echo "CAPAS-FAIL: sqlite3 fuera de lib/model"; exit 1; fi
+	@if grep -rnE '(^|[^[:alnum:]_])whiptail[[:space:]]' lib/api lib/model lib/web lib/config.sh lib/validators.sh lib/crypto.sh lib/logging.sh 2>/dev/null | grep -v '#.*whiptail'; then echo "CAPAS-FAIL: whiptail fuera de lib/ui"; exit 1; fi
+	@if grep -rn 'read -rp\|read -rsp' lib/api lib/model lib/web 2>/dev/null | grep -v '#.*read -r'; then echo "CAPAS-FAIL: read interactivo fuera de lib/ui"; exit 1; fi
+	@if grep -rnE '(^|[^[:alnum:]_])socat[[:space:]]' lib/api lib/model lib/ui lib/web bin server.sh 2>/dev/null | grep -v 'lib/web/dispatch.sh' | grep -v 'bin/server' | grep -v '#.*socat'; then echo "CAPAS-FAIL: socat solo en bin/server y lib/web/dispatch.sh"; exit 1; fi
+	@if grep -rnE '(^|[^[:alnum:]_])jq[[:space:]]' lib/api lib/model lib/ui lib/config.sh lib/validators.sh lib/crypto.sh lib/logging.sh bin 2>/dev/null | grep -v '#.*jq'; then echo "CAPAS-FAIL: jq solo en lib/web"; exit 1; fi
+	@echo "-- capas OK (web -> api -> model -> config)"
+	shfmt -d -i 4 -ci bin/app bin/server lib/*.sh lib/*/*.sh || echo "(aviso) shfmt sugiere formato; el estilo del lab usa '>> \"$$f\"' con espacio, se mantiene a propósito"
 	@echo "check OK"
 
-fmt: ## Formatea bin + lib con shfmt (4 espacios, como el lab)
-	shfmt -w -i 4 -ci bin/app ejercicio-5.sh lib/*.sh
+fmt: ## Formatea entrypoints + lib con shfmt (4 espacios, como el lab)
+	shfmt -w -i 4 -ci bin/app bin/server ejercicio-5.sh server.sh lib/*.sh lib/*/*.sh
 
 run: ## Corre app modular en TUI (bin/app + lib, default --tui)
 	./bin/app --tui
@@ -53,6 +57,12 @@ run-cli: ## Corre app modular en CLI (paridad Lab 05)
 
 run-dist: ## Corre stub de entrega (./ejercicio-5.sh -> bin/app, default --tui)
 	./ejercicio-5.sh
+
+run-web: ## Levanta el servidor web (stub ./server.sh -> bin/server)
+	./server.sh
+
+run-web-dev: ## Levanta el servidor web modular (bin/server)
+	./bin/server
 
 init: ## Crea var/ + data.sq3 (schema) + seed ejemplo (delega en scripts/deploy.sh)
 	./scripts/deploy.sh --seed
@@ -68,8 +78,9 @@ seed: ## Re-siembra data.sq3 desde sql/seed.sql (idempotente)
 deploy-check: ## Verifica DB desplegada (fail-fast de la app)
 	./scripts/deploy.sh --check
 
-clean: ## Borra logs y reporte generado (mantiene DB)
+clean: ## Borra logs, reporte y sesiones (mantiene DB)
 	rm -f var/log/system.log var/log/error.log var/report/productos.html
+	rm -rf var/session
 
 clean-all: clean ## Borra también var/db/data.sq3 (reconstruible con make init)
 	rm -f var/db/data.sq3

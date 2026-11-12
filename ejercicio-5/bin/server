@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# bin/server — entrypoint canónico de la interfaz web (única lista de sources).
+# ./server.sh (stub de entrega) delega aquí.
+# Uso: ./bin/server [--check|--handle-request|--help|--version]
+#   sin args: socat TCP-LISTEN:$HTTP_SERVER_PORT,fork -> este mismo binario.
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_DIR"
+
+# Orden canónico: config -> puros/cross -> model -> api -> web.
+# Cada módulo tiene guarda/pragma (re-sourcear es no-op).
+# shellcheck disable=SC1091
+source lib/config.sh
+source lib/validators.sh
+source lib/crypto.sh
+source lib/logging.sh
+source lib/model/db.sh
+source lib/model/products_store.sh
+source lib/model/users_store.sh
+source lib/api/products_api.sh
+source lib/api/auth_api.sh
+source lib/api/report_api.sh
+source lib/web/http.sh
+source lib/web/dispatch.sh
+
+main "$@"
