@@ -67,12 +67,28 @@ server_handle_request() {
     return 0
 }
 
+# @brief Atiende un POST JSON-RPC completo y monta la respuesta en HTTP.
+server_handle_rpc() {
+    rpc_load_registry
+    if ! rpc_load_request; then
+        rpc_load_response
+        return 0
+    fi
+    rpc_process_request
+    rpc_load_response
+}
+
 # @brief Decide el flujo según el método HTTP.
 server_dispatch_request() {
     case "$HTTP_REQUEST_METHOD" in
         GET) http_process_static ;;
-        POST) http_method_not_allowed ;; # checkpoint 2: rpc_process_request
-        *) http_method_not_allowed ;;
+        POST) server_handle_rpc ;;
+        *)
+            # Método HTTP no soportado: error de aplicación con HTTP 200.
+            rpc_reset_response
+            rpc_method_not_allowed
+            rpc_load_response
+            ;;
     esac
 }
 
