@@ -1,0 +1,45 @@
+@startuml runtime
+' Topología de ejecución del Lab 07 (ejercicio-5).
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam rectangleBorderColor #B9C6D6
+skinparam noteBackgroundColor #FDF3DF
+skinparam noteBorderColor #9A6400
+
+actor "Usuario\n(navegador o curl)" as user
+
+node "Host Linux" {
+  rectangle "socat\nTCP-LISTEN:8080, fork" as socat #E6F0FB
+  rectangle "bin/server --handle-request\n(proceso bash por conexión)" as server #E6F0FB
+  rectangle "bin/app\n(CLI / TUI)" as app #E6F0FB
+  rectangle "lib/web\nhttp · rpc · handlers · session" as web #E6F0FB
+  rectangle "lib/api\n~*_data + formatters" as api #E7F6EE
+  rectangle "lib/model\n(único sqlite3)" as model #FDF3DF
+  rectangle "lib/ui\n(cli · tui · dispatch)" as ui #E6F0FB
+  database "var/db/data.sq3" as db #F1F3F5
+  folder "static/\nindex.html · app.js · styles.css" as static #F1F3F5
+  file "var/report/productos.html" as report #F1F3F5
+  file "var/log/system.log\nerror.log" as logs #F1F3F5
+  file "var/session/sessions.tsv" as sessions #F1F3F5
+}
+
+user --> socat : HTTP/1.1
+socat --> server : EXEC\n(fork por conexión)
+server --> web
+web --> api
+app --> ui
+ui --> api
+api --> model
+model --> db : sqlite3
+web --> static : GET
+web --> report : GET /report/
+web --> sessions : flock
+api --> logs : auditoría / errores
+
+note bottom of socat
+  Sin estado compartido en memoria:
+  cada conexión atiende un proceso bash nuevo.
+end note
+@enduml

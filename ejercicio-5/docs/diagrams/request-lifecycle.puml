@@ -1,0 +1,60 @@
+@startuml request-lifecycle
+' Ciclo de vida de un request HTTP en bin/server --handle-request.
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam activityBackgroundColor #E6F0FB
+skinparam activityBorderColor #1D5FA7
+skinparam activityDiamondBackgroundColor #FDF3DF
+skinparam activityDiamondBorderColor #9A6400
+
+start
+:socat acepta la conexión\ny hace fork;
+:bin/server --handle-request\n(lee de stdin, escribe en stdout);
+:http_load_headers;
+if (¿request line válida?) then (no)
+  :400 Bad Request;
+  stop
+endif
+:http_load_request\n(Content-Length en bytes, tope 512 KB);
+if (¿body válido?) then (no)
+  :400 Bad Request / 413 Payload Too Large;
+  stop
+endif
+:server_dispatch_request;
+
+switch (método HTTP)
+case (GET)
+  :http_process_static;
+  if (¿realpath dentro del root?) then (no)
+    :404 Not Found;
+    stop
+  endif
+  :200 + MIME + Content-Length;
+case (POST)
+  :server_handle_rpc;
+  :rpc_load_request (jq);
+  if (¿envelope válido?) then (no)
+    :error -32700 / -32600 / -32602;
+  else (sí)
+    :rpc_process_request;
+    if (¿método privado?) then (sí)
+      :session_validate (flock -s);
+      if (¿token vigente?) then (no)
+        :error -32001;
+      else (sí)
+        :handler -> ~*_data -> model;
+      endif
+    else (público)
+      :handler;
+    endif
+  endif
+  :rpc_load_response\n(HTTP 200 + JSON);
+case (otro)
+  :-32005 con HTTP 200;
+endswitch
+
+:http_send_headers + body\n(Connection: close);
+stop
+@enduml

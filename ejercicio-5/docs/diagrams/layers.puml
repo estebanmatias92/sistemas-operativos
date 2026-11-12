@@ -1,0 +1,57 @@
+@startuml layers
+' Reglas de dependencia entre capas (web/app/ui -> api -> model -> config).
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam packageBorderColor #B9C6D6
+skinparam noteBackgroundColor #FDF3DF
+skinparam noteBorderColor #9A6400
+
+package "Entrypoints" as entry #F1F3F5 {
+  rectangle "bin/app" as app #E6F0FB
+  rectangle "bin/server" as server #E6F0FB
+}
+
+package "Presentación" as pres #E6F0FB {
+  rectangle "lib/ui" as ui
+  rectangle "lib/web" as web
+}
+
+package "API" as api_layer #E7F6EE {
+  rectangle "lib/api\n~*_data + formatters" as api
+}
+
+package "Modelo" as model_layer #FDF3DF {
+  rectangle "lib/model\núnico sqlite3" as model
+}
+
+package "Base transversal" as base #F1F3F5 {
+  rectangle "lib/config" as config
+  rectangle "lib/validators" as validators
+  rectangle "lib/crypto" as crypto
+  rectangle "lib/logging" as logging
+}
+
+database "var/db/data.sq3" as db #F1F3F5
+
+app --> ui
+server --> web
+web --> api
+ui --> api
+api --> model
+model --> db
+
+api ..> validators
+api ..> crypto
+
+note bottom
+  **Transversales:** lib/config se carga primero;
+  logging, validators y crypto se usan desde varias capas.
+  **Reglas verificadas por make check:**
+  * sqlite3 solo en lib/model/
+  * whiptail y read -rp/read -rsp solo en lib/ui/
+  * socat solo en bin/server y lib/web/dispatch.sh
+  * jq solo en lib/web/
+end note
+@enduml

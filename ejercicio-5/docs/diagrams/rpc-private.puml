@@ -1,0 +1,48 @@
+@startuml rpc-private
+' Secuencia de un método RPC privado (ejemplo: products.list).
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam sequenceActorBackgroundColor #E6F0FB
+skinparam sequenceParticipantBackgroundColor #E6F0FB
+skinparam sequenceLifeLineBackgroundColor #F1F3F5
+skinparam noteBackgroundColor #FDF3DF
+skinparam noteBorderColor #9A6400
+
+autonumber
+actor "Navegador\n(app.js)" as B
+participant "socat\n(fork)" as S
+participant "rpc.sh" as R
+participant "session.sh" as SS
+database "sessions.tsv" as F
+participant "handlers.sh" as H
+participant "api (~*_data)" as A
+participant "model" as M
+database "data.sq3" as DB
+
+B -> S : POST / {jsonrpc, method, params.token}
+S -> R : EXEC --handle-request\n(stdin/stdout)
+R -> R : rpc_load_request\n(jq: jsonrpc, method, id, params)
+R -> SS : session_validate(token)
+SS -> F : flock -s + awk (vigente)
+F --> SS : uid, username, expires_at
+
+alt token inválido o vencido
+  R --> B : {"error": -32001}  (HTTP 200)
+else token vigente
+  R -> H : handler(method)
+  H -> A : ~*_data(uid, user, ...)
+  A -> M : consulta / mutación
+  M -> DB : sqlite3 (una sentencia)
+  DB --> M : filas / id
+  A --> H : TSV + auditoría (system.log)
+  H --> R : result JSON
+  R --> B : {"jsonrpc":"2.0","result":...,"id":...}
+end
+
+note over S, R
+  Cada conexión es un proceso bash nuevo:
+  no hay estado compartido en memoria.
+end note
+@enduml

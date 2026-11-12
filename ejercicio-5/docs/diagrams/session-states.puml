@@ -1,0 +1,30 @@
+@startuml session-states
+' Ciclo de vida de una sesión web (var/session/sessions.tsv).
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam stateBackgroundColor #E6F0FB
+skinparam stateBorderColor #1D5FA7
+skinparam noteBackgroundColor #FDF3DF
+skinparam noteBorderColor #9A6400
+
+state "Vigente" as vigente
+state "Revocada" as revocada
+state "Vencida" as vencida
+
+[*] --> vigente : auth.login\nsession_create()
+vigente --> vigente : request privado\nsession_validate()
+vigente --> revocada : auth.logout\nsession_revoke()
+vigente --> vencida : now > expires_at
+vencida --> [*] : session_cleanup()\nborra la fila
+revocada --> [*]
+
+note right of vencida
+  sessions.tsv (TSV)
+  token · uid · username · expires_at (epoch)
+  directorio 700 · archivo 600
+  flock compartido para validar,
+  exclusivo para crear/revocar/limpiar
+end note
+@enduml
