@@ -1,0 +1,45 @@
+@startuml data-model
+' Modelo de datos de var/db/data.sq3.
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A5568
+skinparam classBackgroundColor #FDF3DF
+skinparam classBorderColor #9A6400
+skinparam noteBackgroundColor #FDF3DF
+skinparam noteBorderColor #9A6400
+
+hide circle
+hide empty members
+
+entity "usuarios" as usuarios {
+  * id : INTEGER <<PK>>
+  --
+  * username : TEXT <<UNIQUE>>
+  * hash : TEXT
+}
+
+entity "productos" as productos {
+  * id : INTEGER <<PK>>
+  --
+  * nombre : TEXT
+  * precio : TEXT
+}
+
+note right of usuarios
+  id INTEGER PRIMARY KEY AUTOINCREMENT
+  username UNIQUE NOT NULL
+  hash = SHA-256 hex (64), nunca texto plano
+end note
+
+note right of productos
+  id INTEGER PRIMARY KEY AUTOINCREMENT
+  nombre NOT NULL
+  precio NOT NULL, validado por RE_PRECIO
+end note
+
+note bottom
+  Sin claves foráneas: la auditoría referencia
+  uid/username en system.log, no en la DB.
+end note
+@enduml
