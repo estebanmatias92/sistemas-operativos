@@ -16,28 +16,39 @@ fi
 # @return 0 registrado / 1 inválido o duplicado.
 # @note En éxito audita (el uid se resuelve post-INSERT vía model).
 register_user() {
+    register_user_data "$1" "$2" >/dev/null || return 1
+    printf 'Usuario %s registrado.\n' "$1"
+}
+
+# @brief Variante estructurada para la web: valida + persiste + audita.
+# @param $1 username, $2 contraseña.
+# @stdout "uid<TAB>username".
+# @return 0 ok / 10 inválido / 11 duplicado / 12 error interno.
+register_user_data() {
     local user="$1"
     local pass="$2"
     local hash uid
 
     if ! is_valid_username "$user"; then
         log_error "$(printf 'Error: nombre de usuario inválido: "%s".' "$user")"
-        return 1
+        return 10
     fi
     if [[ -z "$pass" ]]; then
         log_error 'Error: contraseña vacía.'
-        return 1
+        return 10
     fi
     if model_user_exists "$user"; then
         log_error "$(printf 'Error: el usuario "%s" ya existe.' "$user")"
-        return 1
+        return 11
     fi
     hash="$(hash_password "$pass")"
-    model_user_insert "$user" "$hash" || return 1
-    printf 'Usuario %s registrado.\n' "$user"
-    if uid="$(model_user_get_id "$user")" && [[ -n "$uid" ]]; then
-        log_action "$uid" "$user" "$(printf 'registro username="%s"' "$user")"
+    model_user_insert "$user" "$hash" || return 12
+    if ! uid="$(model_user_get_id "$user")" || [[ -z "$uid" ]]; then
+        log_error "$(printf 'Error: no se pudo resolver el uid de "%s".' "$user")"
+        return 12
     fi
+    log_action "$uid" "$user" "$(printf 'registro username="%s"' "$user")"
+    printf '%s\t%s\n' "$uid" "$user"
 }
 
 # @brief Reproduce el hash de lo tipeado y lo compara con el guardado.
@@ -45,24 +56,30 @@ register_user() {
 # @return 0 acceso / 1 denegado.
 # @note En éxito audita; en fallo no loguea (solo éxitos).
 login_user() {
+    login_user_data "$1" "$2" >/dev/null
+}
+
+# @brief Variante estructurada para la web: autentica + audita.
+# @param $1 username, $2 contraseña.
+# @stdout "uid<TAB>username".
+# @return 0 ok / 11 credenciales inválidas / 12 error interno.
+# @note Fallo de credenciales es silencioso (sin log), igual que CLI/TUI.
+login_user_data() {
     local user="$1"
     local pass="$2"
     local want got uid
 
-    if ! model_user_exists "$user"; then
-        return 1
-    fi
+    model_user_exists "$user" || return 11
     if ! want="$(model_user_get_hash "$user")"; then
-        return 1
+        return 12
     fi
     got="$(hash_password "$pass")"
-    if [[ -n "$want" && "$got" == "$want" ]]; then
-        if uid="$(model_user_get_id "$user")" && [[ -n "$uid" ]]; then
-            log_action "$uid" "$user" "$(printf 'login username="%s"' "$user")"
-        fi
-        return 0
+    [[ -n "$want" && "$got" == "$want" ]] || return 11
+    if ! uid="$(model_user_get_id "$user")" || [[ -z "$uid" ]]; then
+        return 12
     fi
-    return 1
+    log_action "$uid" "$user" "$(printf 'login username="%s"' "$user")"
+    printf '%s\t%s\n' "$uid" "$user"
 }
 
 # @brief Id numérico de un username (para que la UI no arme SQL).

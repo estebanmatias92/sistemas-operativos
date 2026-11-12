@@ -107,6 +107,8 @@ rpc_load_request() {
     RPC_REQUEST_METHOD=""
     RPC_REQUEST_ID="null"
     RPC_REQUEST_PARAMS="null"
+    RPC_SESSION_UID=""
+    RPC_SESSION_USER=""
     rpc_reset_response
 
     if [[ -z "$body" ]] || ! jq -e . >/dev/null 2>&1 <<<"$body"; then
@@ -152,6 +154,9 @@ rpc_load_registry() {
     RPC_PUBLIC_HANDLER=()
     RPC_PRIVATE_HANDLER=()
     RPC_PUBLIC_HANDLER['saludar']='rpc_handle_saludar'
+    RPC_PUBLIC_HANDLER['auth.register']='rpc_handle_auth_register'
+    RPC_PUBLIC_HANDLER['auth.login']='rpc_handle_auth_login'
+    RPC_PRIVATE_HANDLER['auth.logout']='rpc_handle_auth_logout'
 }
 
 # @brief Resuelve el método y ejecuta el handler (público o privado).
@@ -167,6 +172,14 @@ rpc_process_request() {
 
     handler="${RPC_PRIVATE_HANDLER[$method]:-}"
     if [[ -n "$handler" ]]; then
+        local token
+        token="$(jq -r '.token // empty' <<<"$RPC_REQUEST_PARAMS" 2>/dev/null || true)"
+        if [[ -z "$token" ]] || ! session_validate "$token"; then
+            rpc_unauthorized
+            return 0
+        fi
+        RPC_SESSION_UID="$SESSION_VALID_UID"
+        RPC_SESSION_USER="$SESSION_VALID_USER"
         "$handler"
         return 0
     fi

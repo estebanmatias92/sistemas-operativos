@@ -21,6 +21,7 @@ source lib/model/users_store.sh
 source lib/api/products_api.sh
 source lib/api/auth_api.sh
 source lib/api/report_api.sh
+source lib/web/session.sh
 source lib/web/http.sh
 source lib/web/rpc.sh
 source lib/web/handlers.sh
