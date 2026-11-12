@@ -161,6 +161,7 @@ rpc_load_registry() {
     RPC_PRIVATE_HANDLER['products.add']='rpc_handle_products_add'
     RPC_PRIVATE_HANDLER['products.update']='rpc_handle_products_update'
     RPC_PRIVATE_HANDLER['products.remove']='rpc_handle_products_remove'
+    RPC_PRIVATE_HANDLER['report.generate']='rpc_handle_report_generate'
 }
 
 # @brief Resuelve el método y ejecuta el handler (público o privado).

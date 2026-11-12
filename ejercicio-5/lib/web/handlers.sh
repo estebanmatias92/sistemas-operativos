@@ -205,3 +205,18 @@ rpc_handle_products_remove() {
         *) rpc_internal_error ;;
     esac
 }
+
+# @brief report.generate (privado): regenera var/report/productos.html.
+# @params {token}
+# @result {path, url}
+rpc_handle_report_generate() {
+    local path url rc=0
+
+    path="$(generate_report_data "$RPC_SESSION_UID" "$RPC_SESSION_USER")" || rc=$?
+    if ((rc != 0)); then
+        rpc_internal_error
+        return 0
+    fi
+    url="/$HTTP_REPORT_PREFIX/${path##*/}"
+    rpc_success "$(jq -nc --arg path "$path" --arg url "$url" '{path: $path, url: $url}')"
+}
