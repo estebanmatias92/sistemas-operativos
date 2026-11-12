@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# bin/app — entrypoint canónico (única lista de sources lib/* en orden).
+# ./ejercicio-5.sh (stub de entrega Classroom) delega aquí.
+# Uso: ./bin/app [--tui|--cli|--help]  |  APP_ROOT=. ./bin/app --cli
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_DIR"
+
+# Orden canónico de carga: config -> puros/cross -> model -> api -> ui.
+# Cada módulo tiene guarda/pragma (re-sourcear es no-op).
+# shellcheck disable=SC1091
+source lib/config.sh
+source lib/validators.sh
+source lib/crypto.sh
+source lib/logging.sh
+source lib/model/db.sh
+source lib/model/products_store.sh
+source lib/model/users_store.sh
+source lib/api/products_api.sh
+source lib/api/auth_api.sh
+source lib/api/report_api.sh
+source lib/ui/cli.sh
+source lib/ui/tui.sh
+source lib/ui/dispatch.sh
+
+main "$@"

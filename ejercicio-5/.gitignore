@@ -1,0 +1,38 @@
+# Compiled binaries
+abm_c
+*.o
+*.out
+*.exe
+
+# Build artifacts
+build/
+cmake-build-*/
+*.so
+*.dylib
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime var/ — se versiona un ejemplo a propósito en Lab05 como evidencia
+# (igual que *.log antes). Solo se ignoran temporales y backups.
+# var/db/data.sq3 var/log/*.log var/report/*.html → VERSIONADOS (evidencia).
+# *.tmp
+
+# Sesiones web — secretos efímeros, NUNCA se versionan.
+var/session/
+
+# Temporary files
+*.tmp
+*.temp
+*.orig
+
+# dist/ — bundle monolítico opcional vía `make dist` (emergencia single-file; no es el entregable)
+dist/*.sh
