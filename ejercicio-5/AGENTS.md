@@ -69,7 +69,7 @@ ejercicio-5/
 
 Reglas: `lib/web` puede usar `jq`, `realpath`, `stat`, `wc`, `head`, `date`, `mkdir`, `flock`, `sha256sum`; **no** `sqlite3` (solo `lib/model`) ni `whiptail` (solo `lib/ui`). `socat` solo en `lib/web/dispatch.sh`/`bin/server`.
 
-`GET` sirve `static/` y, para el reporte, `/report/productos.html` se resuelve contra `var/report/` (misma protección de path traversal). `POST /` es JSON-RPC. El resto de métodos HTTP → `-32005` (o `405`).
+`GET` sirve `static/` y, para el reporte, `/report/productos.html` se resuelve contra `var/report/` (misma protección de path traversal). `POST /` es JSON-RPC. El resto de métodos HTTP → `-32005` con HTTP 200. El servidor escucha en `HTTP_SERVER_HOST` (default `0.0.0.0`, como el ejemplo) y `HTTP_SERVER_PORT` (default `8080`); ambos configurables por env. Para uso local: `HTTP_SERVER_HOST=127.0.0.1`.
 
 ## Superficie RPC
 
@@ -95,6 +95,7 @@ Códigos: `-32700` parse, `-32600` invalid request, `-32601` method not found, `
 - Token: `head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1`.
 - Formato: `token<TAB>uid<TAB>username<TAB>expires_at` (epoch). `auth.login` devuelve el token y `expires_at`; `auth.logout` lo revoca; `session_cleanup` borra vencidos.
 - Concurrencia: `flock` sobre `"$SESSIONS_FILE.lock"`; revoke/cleanup con archivo temporal + `mv` (nunca `sed -i` sobre `data.sq3`).
+- Permisos: `SESSION_DIR` `700`, `sessions.tsv` `600`.
 - Nunca loguear tokens ni contraseñas. `var/session/` va en `.gitignore`.
 
 ## API con datos estructurados
@@ -111,14 +112,17 @@ Agregar variantes `*_data` que devuelvan datos por stdout (TSV/valores) y conser
 
 `add_product`, `list_products`, `update_product`, `remove_product`, `register_user`, `login_user`, `generate_report` pasan a llamar a `*_data` y mantienen **exactamente** sus mensajes. Los handlers web arman JSON con `jq` a partir del TSV; no parsean texto humano.
 
+Códigos de retorno de `*_data` (los handlers mapean a códigos RPC sin duplicar reglas):
+`0` ok · `10` dato inválido (`-32602`) · `11` conflicto/inexistente/credenciales (`-32004`/`-32003`/`-32002`) · `12` error interno (`-32603`). Las funciones históricas traducen cualquier fallo a `return 1`.
+
 ## UI estática
 
-`static/index.html` + `static/app.js` + `static/styles.css`: registro/login, tabla de productos, formularios de alta/edición/baja, botón de reporte y panel de respuesta JSON cruda. `fetch('/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:'2.0', method, params, id})})`. El token se guarda en memoria/`sessionStorage` y viaja en `params.token`; no se usa cookie ni CORS (mismo origen). El reporte se abre con `url` devuelta por `report.generate`.
+`static/index.html` + `static/app.js` + `static/styles.css`: **UI end-user**, no panel de pruebas. Pantalla de acceso (login/registro), cabecera con usuario y logout, tabla de inventario, formulario de alta/edición, confirmación de baja, botón de reporte y mensajes de estado. Sin panel de JSON crudo ni tabla de procedimientos RPC: eso queda en el ejemplo del profesor (`bash-web-rpc-server/static/index.html`), que no se toca. `fetch('/', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:'2.0', method, params, id})})`. El token se guarda en `sessionStorage` y viaja en `params.token`; no se usa cookie ni CORS (mismo origen). El reporte se abre con `url` devuelta por `report.generate`. Los datos se pintan con `textContent`, nunca `innerHTML`.
 
 ## Makefile y `make check`
 
 - Targets nuevos: `run-web` (`./server.sh`), `run-web-dev` (`./bin/server`); `build`/`check`/`fmt` incluyen `server.sh`, `bin/server` y `lib/web/*.sh`.
-- `check` debe verificar: `bash -n` de entrypoints y módulos; `sqlite3` solo en `lib/model`; `whiptail` solo en `lib/ui`; `read -rp`/`read -rsp` solo en `lib/ui`; `socat` solo en `bin/server`/`lib/web/dispatch.sh`.
+- `check` debe verificar: `bash -n` de entrypoints y módulos; `sqlite3` solo en `lib/model`; `whiptail` solo en `lib/ui`; `read -rp`/`read -rsp` solo en `lib/ui`; `socat` solo en `bin/server`/`lib/web/dispatch.sh`; `jq` solo en `lib/web`.
 - `make init` sigue siendo el único dueño de `data.sq3`; `make test` corre bats sin TTY.
 
 ## Verificación
@@ -126,7 +130,8 @@ Agregar variantes `*_data` que devuelvan datos por stdout (TSV/valores) y conser
 ```bash
 make init && make check && make test
 ./server.sh --check
-./server.sh                 # o make run-web; escucha en 8080
+./server.sh                 # o make run-web; escucha en 8080 (0.0.0.0)
+HTTP_SERVER_HOST=127.0.0.1 ./server.sh   # solo local
 curl -s http://localhost:8080/ | head
 curl -s -X POST http://localhost:8080/ -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"saludar"}'
